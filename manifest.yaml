@@ -1,0 +1,44 @@
+display_information:
+  name: slack-management-app
+features:
+  bot_user:
+    display_name: slack-management-app
+  # shortcuts:
+  #   - name: modal-shortcut
+  #     type: global
+  #     callback_id: modal-shortcut
+  #     description: Global shortcut for opening a modal
+  # slash_commands:
+  #   - command: /modal-command
+  #     description: Slash command for opening a modal
+oauth_config:
+  scopes:
+    bot:
+      # - commands
+      # https://api.slack.com/methods/conversations.list
+      - channels:read
+      - groups:read
+      - im:read
+      - mpim:read
+      # https://api.slack.com/methods/conversations.create
+      - channels:manage
+      - groups:write
+      - im:write
+      - mpim:write
+      # https://api.slack.com/methods/conversations.invite
+      - channels:write.invites
+      - groups:write.invites
+      - mpim:write.invites
+      # https://api.slack.com/methods/admin.conversations.invite
+      # ???
+      #
+      # receive mention
+      - chat:write
+      - app_mentions:read
+settings:
+  event_subscriptions:
+    bot_events:
+      - app_mention
+  interactivity:
+    is_enabled: true
+  socket_mode_enabled: true
