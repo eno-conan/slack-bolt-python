@@ -5,32 +5,15 @@ from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk import WebClient
 import slack_operations
 
-# デバッグレベルのログを有効化
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 from dotenv import load_dotenv
 load_dotenv()
 
-# ボットトークンとソケットモードハンドラーを使ってアプリを初期化
-app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
-
-# ショートカットを使って必要事項を入力
-@app.shortcut("modal-shortcut")
-def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
-    # 受信した旨を 3 秒以内に Slack サーバーに伝達
-    ack()
-    # 組み込みのクライアントでviews_openを呼び出し
-    client.views_open(
-        trigger_id=body["trigger_id"],
-        view={
-            "type": "modal",
-            "callback_id": "modal-id",
-            "title": {"type": "plain_text", "text": "Slack操作お助けマン"},
-            "submit": {"type": "plain_text", "text": "送信"},
-            "close": {"type": "plain_text", "text": "閉じる"},
-            "blocks": [
-                {
+# 操作選択のためのドロップダウンBLOCK
+SELECT_ACTION_DROPDOWN_BLOCK = {
                     "type": "section",
+                    "block_id": "operation",
                     "text": {
                         "type": "mrkdwn",
                         "text": "操作を選択"
@@ -40,14 +23,12 @@ def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
                         "placeholder": {
                             "type": "plain_text",
                             "text": "選択",
-                            "emoji": True
                         },
                         "options": [
                             {
                                 "text": {
                                     "type": "plain_text",
                                     "text": "チャンネル新規作成",
-                                    "emoji": True
                                 },
                                 "value": "create-channel"
                             },
@@ -55,19 +36,55 @@ def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
                                 "text": {
                                     "type": "plain_text",
                                     "text": "メンバー追加",
-                                    "emoji": True
                                 },
                                 "value": "add-members"
                             },
                         ],
                         "action_id": "static_select_action"
                     }
-                },                
-            ],
+                }
+
+# ユーザ複数選択のBLOCK
+SELECT_MULTI_USER_BLOCK = {
+                            "type": "input",
+                            "block_id": "select-users",
+                            "element": {
+                                "type": "multi_users_select",
+                                "placeholder": {
+                                    "type": "plain_text",
+                                    "text": "Select users",
+                                },
+                                "action_id": "select-users-action"
+                            },
+                            "label": {
+                                "type": "plain_text",
+                                "text": "対象メンバー",
+                            },
+                            "optional": False,
+                        }
+
+# ボットトークンとソケットモードハンドラーを使ってアプリを初期化
+app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
+
+# ショートカットでモーダル起動
+@app.shortcut("modal-shortcut")
+def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
+    # 受信した旨を3秒以内にSlackサーバーに伝達
+    ack()
+    # モーダル生成
+    client.views_open(
+        trigger_id=body["trigger_id"],
+        view = {
+            "type": "modal",
+            "callback_id": "modal-id",
+            "title": {"type": "plain_text", "text": "Slack操作お助けマン"},
+            "close": {"type": "plain_text", "text": "閉じる"},
+            "blocks": [
+                        SELECT_ACTION_DROPDOWN_BLOCK
+                        ],
         },
     )
 
-# モーダルに含まれる、`static_select_action` という action_id のボタンの呼び出し検知
 @app.action("static_select_action")
 def update_modal(ack: Ack, body: dict, client: WebClient):
     # ボタンのリクエストを確認
@@ -79,50 +96,32 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
             "submit": {"type": "plain_text", "text": "送信"},
             "close": {"type": "plain_text", "text": "閉じる"}
         }
-    # block_idは動的な値
-    block_id = body["view"]["blocks"][0]["block_id"]
+
     # ドロップダウンの入力値取得
-    selected_operation = body["view"]["state"]["values"][block_id]["static_select_action"]["selected_option"]["value"]
+    selected_operation = body["view"]["state"]["values"]['operation'] \
+        ["static_select_action"]["selected_option"]["value"]
     
     if selected_operation == 'create-channel':
         view["blocks"] = [
-                    {
-                        "type": "input",
-                        "block_id": "text-input",
-                        "element": {"type": "plain_text_input", "action_id": "action-id",
-                                    "placeholder": {
-                                        "type": "plain_text",
-                                        "text": "チャンネル名入力",
-                                        "emoji": True
-                                        }
-                                    },
-                        "label": {"type": "plain_text", "text": "新規チャンネル名",},
-                        "optional": True,
-                    },
-                    {
-                        "type": "input",
-                        "element": {
-                            "type": "multi_users_select",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "Select users",
-                                "emoji": True
+            {
+                "type": "input",
+                "block_id": "create-channel",
+                "element": {
+                                "type": "plain_text_input", 
+                                "action_id": "action-id",
+                                "placeholder": {
+                                    "type": "plain_text",
+                                    "text": "チャンネル名入力",
+                                }
                             },
-                            "action_id": "multi_users_select-action"
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "対象メンバー",
-                            "emoji": True
-                        }
-                    },
+                "label": {"type": "plain_text", "text": "新規チャンネル名"},
+                "optional": False,
+            },
+            SELECT_MULTI_USER_BLOCK
                 ]
         client.views_update(
-            # view_id を渡すこと
             view_id=body["view"]["id"],
-            # 競合状態を防ぐためのビューの状態を示す文字列
             hash=body["view"]["hash"],
-            # 更新後の blocks を含むビューのペイロード
             view=view
         )
     elif selected_operation== 'add-members':
@@ -131,44 +130,26 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
                         "type": "input",
                         "label": {
                             "type": "plain_text",
-                            "text": "既存チャンネル名",
-                            "emoji": True
+                            "text": "既存チャンネル名"
+                            
                         },
-                        "optional": True,
+                        "optional": False,
+                        "block_id": "select-channel",
                         "element": {
                             "type": "conversations_select",
                             # "type": "multi_conversations_select",
                             "placeholder": {
                                 "type": "plain_text",
-                                "text": ":mega: メンバーを追加するチャンネル選択",
-                                "emoji": True
-                            }
+                                "text": ":mega: メンバーを追加するチャンネル選択"
+                            },
+                            "action_id": "conversations_select-action"
                         }
                     }, 
-                    {
-                        "type": "input",
-                        "element": {
-                            "type": "multi_users_select",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": "選択してください",
-                                "emoji": True
-                            },
-                            "action_id": "multi_users_select-action"
-                        },
-                        "label": {
-                            "type": "plain_text",
-                            "text": "対象メンバー",
-                            "emoji": True
-                        }
-                    },  
+                    SELECT_MULTI_USER_BLOCK
                 ]
         client.views_update(
-            # view_id を渡すこと
             view_id=body["view"]["id"],
-            # 競合状態を防ぐためのビューの状態を示す文字列
             hash=body["view"]["hash"],
-            # 更新後の blocks を含むビューのペイロード
             view=view
         )
     else:
@@ -178,17 +159,13 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
                 "text": {
                     "type": "plain_text",
                     "text": "This is a plain text section block.",
-                    "emoji": True
                 }
             }
             ]
-        # 不正？不具合
         client.views_update(
-        # view_id を渡すこと
         view_id=body["view"]["id"],
-        # 競合状態を防ぐためのビューの状態を示す文字列
         hash=body["view"]["hash"],
-        # 更新後の blocks を含むビューのペイロード
+        
         view=view
                 # {
                 #     "type": "section",
@@ -201,20 +178,58 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
                 # }
     )
 
-# 「送信」ボタンが押されたときに呼び出されます
+# view_submissionリクエストを処理
 @app.view("modal-id")
-# @app.view({"type": "view_closed", "callback_id": "modal-id"})
-def handle_view_submission(ack: Ack, view: dict, logger: logging.Logger):
-    ack()
+def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger):
+    submitted_data = view["state"]["values"]
+    
+    # 【入力値検証】
+    # チャンネル入力でユーザが含まれる場合
+    # ユーザ入力にチャンネルが含まれる場合
+    # 新規チャンネル側で入力したチャンネルが既に存在する場合
+    
+    if submitted_data.get('create-channel'):
+        # チャンネル新規作成
+        create_channel_name = submitted_data['create-channel']['action-id']['value']
+        print(create_channel_name)
+    elif submitted_data.get('select-channel'):
+        # チャンネルメンバー追加
+        target_channel = submitted_data['select-channel']['conversations_select-action']['selected_conversation']
+        print(target_channel)
+    else:
+        pass
+    users = submitted_data['select-users']['select-users-action']['selected_users']
+    print(users)
+        
     # slack_operations.fetch_conversations(client)
-    logger.info(f'view["state"]["values"]:{view["state"]["values"]}')
+    # errors = {}
+    # if hopes_and_dreams is not None and len(hopes_and_dreams) <= 5:
+    #     errors["create-channel"] = "The value must be longer than 5 characters"
+    #     # client.chat_postMessage(channel=user, text=msg)
+    # if len(errors) > 0:
+    #     print("AAA")
+    #     ack(response_action="errors", errors=errors)
+    #     return
+    
+    # モーダルを閉じる
+    ack()
+    
+    # 入力結果をユーザーに送信
+    userId = body["user"]["id"]
+    msg = f"<@{userId}>さんから申請がありました\n"
+
+    # ユーザーにメッセージを送信
+    try:
+        client.chat_postMessage(channel='C06QD36AEUA', text=msg)
+    except Exception as e:
+        logger.exception(f"Failed to post a message {e}")
 
 # アプリを起動
 if __name__ == "__main__":
     SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()
 
-# 以下は念のため保存しているコード
-# メンション
+# 以下、念のため保存
+# メンションによる処理呼び出し
 # @app.event("app_mention")
 # def handle_app_mention(body: dict, say, logger,client: WebClient):
 #     # メンションされたメッセージを取得

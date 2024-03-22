@@ -1,10 +1,14 @@
+
+# https://kikumoto.hatenablog.com/entry/2022/11/09/081734
+# Steps from Apps for legacy workflows are now deprecated. More information
+# https://api.slack.com/changelog/2023-08-workflow-steps-from-apps-step-back
 # # https://slack.dev/bolt-python/ja-jp/concepts#steps
-# # ちょっと保留？
-# import os
-# from slack_bolt import App
-# from slack_bolt.workflows.step import WorkflowStep
-# from dotenv import load_dotenv
-# load_dotenv()
+# # ちょっと保留？（非推奨らしい）
+import os
+from slack_bolt import App
+from slack_bolt.workflows.step import WorkflowStep
+from dotenv import load_dotenv
+load_dotenv()
 
 # # いつも通りBolt アプリを起動する
 # app = App(
@@ -85,4 +89,41 @@
 #     execute=execute,
 # )
 # # ワークフローステップを渡してリスナーを設定する
+# app.step(ws)
+
+# app = App(
+#     token=os.environ.get("SLACK_BOT_TOKEN"),
+#     signing_secret=os.environ.get("SLACK_SIGNING_SECRET"),
+#     process_before_response=False,
+# )
+
+
+# # WorkflowStep 定義
+
+# def edit(ack, step, configure, logger):
+#     ack()
+#     logger.info(step)
+
+#     blocks = []
+#     configure(blocks=blocks)
+
+# def save(ack, body, view, update, logger):
+#     ack()
+#     logger.info(body)
+
+#     update(inputs={}, outputs=[])
+
+# def execute(body, client, step, complete, fail, logger):
+#     logger.info(body)
+#     complete(outputs={})
+
+
+# # WorkflowStep 登録
+
+# ws = WorkflowStep(
+#     callback_id="sample-step",
+#     edit=edit,
+#     save=save,
+#     execute=execute,
+# )
 # app.step(ws)
