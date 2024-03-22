@@ -3,6 +3,7 @@ import logging
 from slack_bolt import App, Ack, Say, BoltContext, Respond
 from slack_bolt.adapter.socket_mode import SocketModeHandler
 from slack_sdk import WebClient
+import slack_operations
 
 # デバッグレベルのログを有効化
 logging.basicConfig(level=logging.DEBUG)
@@ -11,24 +12,14 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # ボットトークンとソケットモードハンドラーを使ってアプリを初期化
-app = App(token=os.environ.get("SLACK_BOT_TOKEN2"))
-
-# アプリ（slack-management-app）をワークフロー内のメンション経由で呼び出す
-@app.event("app_mention")
-def handle_app_mention(body, say, logger):
-    # メンションされたメッセージを取得
-    text = body["event"]["text"]
-    logger.info(f"メンションされました: {text}")
-    
-    # 応答メッセージを送信
-    say(f"メンションを受信しました: {text}")
+app = App(token=os.environ.get("SLACK_BOT_TOKEN"))
 
 # ショートカットを使って必要事項を入力
 @app.shortcut("modal-shortcut")
 def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
     # 受信した旨を 3 秒以内に Slack サーバーに伝達
     ack()
-    # 組み込みのクライアントで views_open を呼び出し
+    # 組み込みのクライアントでviews_openを呼び出し
     client.views_open(
         trigger_id=body["trigger_id"],
         view={
@@ -76,12 +67,11 @@ def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
         },
     )
 
-# モーダルに含まれる、`button_abc` という action_id のボタンの呼び出しをリッスン
+# モーダルに含まれる、`static_select_action` という action_id のボタンの呼び出し検知
 @app.action("static_select_action")
 def update_modal(ack: Ack, body: dict, client: WebClient):
     # ボタンのリクエストを確認
     ack()
-    
     view = {               
             "type": "modal",
             "callback_id": "modal-id",
@@ -89,9 +79,9 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
             "submit": {"type": "plain_text", "text": "送信"},
             "close": {"type": "plain_text", "text": "閉じる"}
         }
-    # block_idだけ動的みたい
+    # block_idは動的な値
     block_id = body["view"]["blocks"][0]["block_id"]
-    # 入力値取得
+    # ドロップダウンの入力値取得
     selected_operation = body["view"]["state"]["values"][block_id]["static_select_action"]["selected_option"]["value"]
     
     if selected_operation == 'create-channel':
@@ -216,15 +206,42 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
 # @app.view({"type": "view_closed", "callback_id": "modal-id"})
 def handle_view_submission(ack: Ack, view: dict, logger: logging.Logger):
     ack()
-    # state.values.{block_id}.{action_id}
-    logger.info(view["state"]["values"])
-
+    # slack_operations.fetch_conversations(client)
+    logger.info(f'view["state"]["values"]:{view["state"]["values"]}')
 
 # アプリを起動
 if __name__ == "__main__":
-    SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN2")).start()
+    SocketModeHandler(app, os.environ.get("SLACK_APP_TOKEN")).start()
 
-# 以下、参考コード
+# 以下は念のため保存しているコード
+# メンション
+# @app.event("app_mention")
+# def handle_app_mention(body: dict, say, logger,client: WebClient):
+#     # メンションされたメッセージを取得
+#     # text = body["event"]["text"]
+#     # logger.info(f"メンションされました: {text}")
+#     # # 応答メッセージを送信
+#     # say(f"メンションを受信しました: {text}")
+    
+#     # time.sleep(3)
+#     mention = body["event"]
+#     print(mention)
+#     # メンションされたメッセージを取得
+#     text = mention["text"]
+#     thread_ts = mention["ts"]
+    
+#     slack_operations.fetch_conversations(client)
+#     # create_conversations(client)
+#     # invite_user(client)
+    
+#     # 例: メンションされたメッセージをログに出力する
+#     logger.info(f"メンションされました: {text}")
+    
+#     # 応答メッセージを送信（スレッドに送信）
+#     # https://zenn.dev/t_yng/scraps/8374a9616c235e
+#     say(f"{text}", thread_ts=thread_ts)
+
+# スラッシュコマンド
 # @app.command("/modal-command")
 # def handle_some_command(ack: Ack, body: dict, client: WebClient):
 #     # 受信した旨を 3 秒以内に Slack サーバーに伝えます
@@ -269,7 +286,7 @@ if __name__ == "__main__":
 #         },
 #     )
 
-# view.callback_id にマッチング（この値で固定でいいのか？）
+# スラッシュコマンドでの入力処理
 # @app.view("modal-id")
 # def handle_view_events(ack: Ack, view: dict, logger: logging.Logger):
 #     # 送信された input ブロックの情報はこの階層以下に入っています

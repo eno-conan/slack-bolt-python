@@ -1,20 +1,20 @@
 display_information:
-  name: slack-management-app
+  name: slack-management-app-v3
 features:
   bot_user:
-    display_name: slack-management-app
-  # shortcuts:
-  #   - name: modal-shortcut
-  #     type: global
-  #     callback_id: modal-shortcut
-  #     description: Global shortcut for opening a modal
+    display_name: slack-management-app-v3
+  shortcuts:
+    - name: modal-shortcut
+      type: global
+      callback_id: modal-shortcut
+      description: Global shortcut for opening a modal
   # slash_commands:
   #   - command: /modal-command
   #     description: Slash command for opening a modal
 oauth_config:
   scopes:
     bot:
-      # - commands
+      - commands # これ設定しないと、ショートカット実行時エラー
       # https://api.slack.com/methods/conversations.list
       - channels:read
       - groups:read
