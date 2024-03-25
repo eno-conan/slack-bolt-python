@@ -1,12 +1,12 @@
 display_information:
-  name: slack-management-app-v3
 features:
+  name: slack-channel-configulation-app
   bot_user:
-    display_name: slack-management-app-v3
+    display_name: slack-channel-configulation-app
   shortcuts:
-    - name: modal-shortcut
+    - name: channel-configulation
       type: global
-      callback_id: modal-shortcut
+      callback_id: channel-configulation
       description: Global shortcut for opening a modal
   # slash_commands:
   #   - command: /modal-command
@@ -37,8 +37,8 @@ oauth_config:
       - app_mentions:read
 settings:
   event_subscriptions:
-    bot_events:
-      - app_mention
+    # bot_events:
+    #   - app_mention
   interactivity:
     is_enabled: true
-  socket_mode_enabled: true
+  # socket_mode_enabled: true
