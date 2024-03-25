@@ -64,8 +64,8 @@ SELECT_MULTI_USER_BLOCK = {
                         }
 
 # ボットトークンとソケットモードハンドラーを使ってアプリを初期化
-app = App(token=os.environ.get('SLACK_BOT_TOKEN'), 
-          signing_secret=os.environ.get("SLACK_SIGNING_SECRET")
+app = App(token = os.environ.get('SLACK_BOT_TOKEN'), 
+          signing_secret = os.environ.get("SLACK_SIGNING_SECRET")
           )
 
 # 重複防止
@@ -77,7 +77,7 @@ def skip_retry(logger, request, next):
 # ショートカットでモーダル起動
 @app.shortcut('modal-shortcut')
 def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
-    # 受信した旨を3秒以内にSlackサーバーに伝達
+    # 受信した旨をSlackサーバーに伝達
     ack()
     
     # モーダル生成
@@ -86,7 +86,7 @@ def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
         view = {
             'type': 'modal',
             'callback_id': 'modal-id',
-            'title': {'type': 'plain_text', 'text': 'Slack操作お助けマン'},
+            'title': {'type': 'plain_text', 'text': 'Slackチャンネル設定ツール'},
             'close': {'type': 'plain_text', 'text': '閉じる'},
             'blocks': [
                         SELECT_ACTION_DROPDOWN_BLOCK
@@ -102,7 +102,7 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
     view = {               
             'type': 'modal',
             'callback_id': 'modal-id',
-            'title': {'type': 'plain_text', 'text':'Slackお助けマン'},
+            'title': {'type': 'plain_text', 'text':'Slackチャンネル設定ツール'},
             'submit': {'type': 'plain_text', 'text': '送信'},
             'close': {'type': 'plain_text', 'text': '閉じる'}
         }
@@ -128,12 +128,14 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
                 'optional': False,
             },
             {
-			"type": "section",
-			"text": {
-				"type": "plain_text",
-				"text": "※小文字のアルファベット・数字・ハイフン・アンダースコア以外はつかえません。",
-				"emoji": False
-			}
+			"type": "context",
+			"elements": [
+				{
+					"type": "plain_text",
+					"text": "英字・記号について、英字は小文字、記号はハイフン・アンダースコアのみ使用可能",
+					"emoji": True
+				}
+			]
 		    },
             SELECT_MULTI_USER_BLOCK
                 ]
@@ -143,24 +145,24 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
             view=view
         )
     elif selected_operation == 'add-members':
-        view["blocks"] = [
+        view['blocks'] = [
                     {
-                        "type": "input",
-                        "label": {
-                            "type": "plain_text",
-                            "text": "既存チャンネル名"
+                        'type': 'input',
+                        'label': {
+                            'type': 'plain_text',
+                            'text': '既存チャンネル名'
                             
                         },
-                        "optional": False,
-                        "block_id": "select-channel",
-                        "element": {
-                            "type": "conversations_select",
-                            # "type": "multi_conversations_select",
-                            "placeholder": {
-                                "type": "plain_text",
-                                "text": ":mega: メンバーを追加するチャンネル選択"
+                        'optional': False,
+                        'block_id': 'select-channel',
+                        'element': {
+                            'type': 'conversations_select',
+                            # 'type': 'multi_conversations_select',
+                            'placeholder': {
+                                'type': 'plain_text',
+                                'text': ':mega: メンバー追加するチャンネル選択'
                             },
-                            "action_id": "conversations_select-action"
+                            'action_id': 'conversations_select-action'
                         }
                     }, 
                     SELECT_MULTI_USER_BLOCK
@@ -213,7 +215,7 @@ def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger)
         channels_name = slack_operations.fetch_conversations(client)
         for name in channels_name:
             if input_channel_name == name:
-                errors['create-channel'] = '既に存在するチャンネル名です'
+                errors['create-channel'] = '既に存在するチャンネル名です。'
                 ack(response_action='errors', errors=errors)
                 return
             
@@ -227,25 +229,21 @@ def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger)
         
         # チャンネル入力箇所にユーザが含まれる場合
         if input_channel_id.startswith('U'):
-            errors['select-channel'] = 'チャンネルを選択してください'
+            errors['select-channel'] = 'チャンネルを選択してください。'
             ack(response_action='errors', errors=errors)
             return
 
         # チャンネルIDからチャンネル名取得
         channel = slack_operations.getting_conversation_info(client=client,channel_id=input_channel_id)
         target_channel_name = channel['name']
-    else:
-        pass
     
     users = submitted_data['select-users']['select-users-action']['selected_users']
     res = slack_operations.invite_users(client,channel_id=input_channel_id, invite_users_list=users)
     
     if res is None:
-        errors['select-users'] = '参加しているメンバーのみ選択されています。'
+        errors['select-users'] = '参加メンバーのみ選択されています。'
         ack(response_action='errors', errors=errors)
-        return    
-    else:
-        receive_request_channel_id = res['channel']['id']
+        return
 
     # モーダルを閉じる
     ack()
@@ -254,16 +252,14 @@ def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger)
     userId = body['user']['id']
     msg = f'<@{userId}>さんから申請がありました\n\n■申請内容:{action}\n\n■チャンネル名:{target_channel_name}'
     try:
-        client.chat_postMessage(channel=receive_request_channel_id, text=msg)
-        # client.chat_postMessage(channel='C06QD36AEUA', text=msg)
+        client.chat_postMessage(channel = os.environ.get('REQUEST_NOTIFY_CHANNEL','work'), text=msg)
     except Exception as e:
         logger.exception(f'Failed to post a message {e}')
         
 @app.event('app_mention')
 def handle_app_mention(body: dict, say, logger,client: WebClient):
     # メンションされたメッセージを取得
-    
-    # time.sleep(3)
+
     mention = body['event']
     print(mention)
     # メンションされたメッセージを取得
@@ -279,7 +275,7 @@ def handle_app_mention(body: dict, say, logger,client: WebClient):
     
     # 応答メッセージを送信（スレッドに送信）
     # https://zenn.dev/t_yng/scraps/8374a9616c235e
-    say(f'{text}', thread_ts=thread_ts)        
+    say(f'{text}', thread_ts=thread_ts)
 
 # アプリを起動
 if __name__ == '__main__':

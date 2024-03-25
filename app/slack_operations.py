@@ -48,7 +48,7 @@ def getting_conversation_info(client: WebClient,channel_id:str):
         )
         return response['channel']
     except SlackApiError as e:
-        print('Error creating conversations: {}'.format(e))
+        print('Error getting conversation info: {}'.format(e))
 
 def invite_users(client: WebClient,channel_id:str,invite_users_list:List[str]):
     try:
