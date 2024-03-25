@@ -65,7 +65,8 @@ SELECT_MULTI_USER_BLOCK = {
 
 # ボットトークンとソケットモードハンドラーを使ってアプリを初期化
 app = App(token=os.environ.get('SLACK_BOT_TOKEN'), 
-          signing_secret=os.environ.get("SLACK_SIGNING_SECRET"))
+          signing_secret=os.environ.get("SLACK_SIGNING_SECRET")
+          )
 
 # 重複防止
 @app.middleware
@@ -78,6 +79,7 @@ def skip_retry(logger, request, next):
 def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
     # 受信した旨を3秒以内にSlackサーバーに伝達
     ack()
+    
     # モーダル生成
     client.views_open(
         trigger_id=body['trigger_id'],
@@ -96,6 +98,7 @@ def handle_shortcuts(ack: Ack, body: dict, client: WebClient):
 def update_modal(ack: Ack, body: dict, client: WebClient):
     # ボタンのリクエストを確認
     ack()
+    
     view = {               
             'type': 'modal',
             'callback_id': 'modal-id',
@@ -124,6 +127,14 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
                 'label': {'type': 'plain_text', 'text': '新規チャンネル名'},
                 'optional': False,
             },
+            {
+			"type": "section",
+			"text": {
+				"type": "plain_text",
+				"text": "※小文字のアルファベット・数字・ハイフン・アンダースコア以外はつかえません。",
+				"emoji": False
+			}
+		    },
             SELECT_MULTI_USER_BLOCK
                 ]
         client.views_update(
@@ -131,7 +142,7 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
             hash=body['view']['hash'],
             view=view
         )
-    elif selected_operation== 'add-members':
+    elif selected_operation == 'add-members':
         view["blocks"] = [
                     {
                         "type": "input",
@@ -187,44 +198,88 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
 # view_submissionリクエストを処理
 @app.view('modal-id')
 def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger):
-    submitted_data = view['state']['values']
-    
+    # ユーザに表示する情報
+    action = ''
+    target_channel_name = ''
     errors = {}
-    if submitted_data.get('create-channel'):
-        # チャンネル新規作成の場合
-        create_channel_name = submitted_data['create-channel']['action-id']['value']
+
+    # 入力値の検証
+    submitted_data = view['state']['values']
+    if submitted_data.get('create-channel'): # チャンネル新規作成の場合
+        action = ' チャンネル新規作成'
+        input_channel_name = submitted_data['create-channel']['action-id']['value']
         
         # 入力されたチャンネル名の存在判定
         channels_name = slack_operations.fetch_conversations(client)
         for name in channels_name:
-            if create_channel_name == name:
+            if input_channel_name == name:
                 errors['create-channel'] = '既に存在するチャンネル名です'
                 ack(response_action='errors', errors=errors)
                 return
-    elif submitted_data.get('select-channel'):
-        # チャンネルメンバー追加の場合
-        target_channel = submitted_data['select-channel']['conversations_select-action']['selected_conversation']
-        # チャンネル入力箇所にでユーザが含まれる場合
-        if target_channel.startswith('U'):
+            
+        # チャンネル重複なし、チャンネル作成
+        channel = slack_operations.create_conversation(client=client,channel_name=input_channel_name)
+        input_channel_id = channel['id']
+        target_channel_name = channel['name']
+    elif submitted_data.get('select-channel'): # チャンネルメンバー追加の場合
+        action = 'チャンネルメンバー追加'
+        input_channel_id = submitted_data['select-channel']['conversations_select-action']['selected_conversation']
+        
+        # チャンネル入力箇所にユーザが含まれる場合
+        if input_channel_id.startswith('U'):
             errors['select-channel'] = 'チャンネルを選択してください'
             ack(response_action='errors', errors=errors)
             return
+
+        # チャンネルIDからチャンネル名取得
+        channel = slack_operations.getting_conversation_info(client=client,channel_id=input_channel_id)
+        target_channel_name = channel['name']
     else:
         pass
     
     users = submitted_data['select-users']['select-users-action']['selected_users']
+    res = slack_operations.invite_users(client,channel_id=input_channel_id, invite_users_list=users)
+    
+    if res is None:
+        errors['select-users'] = '参加しているメンバーのみ選択されています。'
+        ack(response_action='errors', errors=errors)
+        return    
+    else:
+        receive_request_channel_id = res['channel']['id']
+
     # モーダルを閉じる
     ack()
     
-    # 入力結果をユーザーに送信
-    userId = body['user']['id']
-    msg = f'<@{userId}>さんから申請がありました\n'
-
     # ユーザーにメッセージを送信
+    userId = body['user']['id']
+    msg = f'<@{userId}>さんから申請がありました\n\n■申請内容:{action}\n\n■チャンネル名:{target_channel_name}'
     try:
-        client.chat_postMessage(channel='C06QD36AEUA', text=msg)
+        client.chat_postMessage(channel=receive_request_channel_id, text=msg)
+        # client.chat_postMessage(channel='C06QD36AEUA', text=msg)
     except Exception as e:
         logger.exception(f'Failed to post a message {e}')
+        
+@app.event('app_mention')
+def handle_app_mention(body: dict, say, logger,client: WebClient):
+    # メンションされたメッセージを取得
+    
+    # time.sleep(3)
+    mention = body['event']
+    print(mention)
+    # メンションされたメッセージを取得
+    text = mention['text']
+    thread_ts = mention['ts']
+    
+    slack_operations.fetch_conversations(client)
+    # create_conversations(client)
+    # invite_user(client)
+    
+    # 例: メンションされたメッセージをログに出力する
+    logger.info(f'メンションされました: {text}')
+    
+    # 応答メッセージを送信（スレッドに送信）
+    # https://zenn.dev/t_yng/scraps/8374a9616c235e
+    say(f'{text}', thread_ts=thread_ts)        
 
 # アプリを起動
 if __name__ == '__main__':
@@ -232,33 +287,6 @@ if __name__ == '__main__':
     # app.start(port=int(os.environ.get("PORT", 8080)))
 
 # 以下、念のため保存
-# メンションによる処理呼び出し
-# @app.event('app_mention')
-# def handle_app_mention(body: dict, say, logger,client: WebClient):
-#     # メンションされたメッセージを取得
-#     # text = body['event']['text']
-#     # logger.info(f'メンションされました: {text}')
-#     # # 応答メッセージを送信
-#     # say(f'メンションを受信しました: {text}')
-    
-#     # time.sleep(3)
-#     mention = body['event']
-#     print(mention)
-#     # メンションされたメッセージを取得
-#     text = mention['text']
-#     thread_ts = mention['ts']
-    
-#     slack_operations.fetch_conversations(client)
-#     # create_conversations(client)
-#     # invite_user(client)
-    
-#     # 例: メンションされたメッセージをログに出力する
-#     logger.info(f'メンションされました: {text}')
-    
-#     # 応答メッセージを送信（スレッドに送信）
-#     # https://zenn.dev/t_yng/scraps/8374a9616c235e
-#     say(f'{text}', thread_ts=thread_ts)
-
 # スラッシュコマンド
 # @app.command('/modal-command')
 # def handle_some_command(ack: Ack, body: dict, client: WebClient):
@@ -303,24 +331,3 @@ if __name__ == '__main__':
 #             ],
 #         },
 #     )
-
-# スラッシュコマンドでの入力処理
-# @app.view('modal-id')
-# def handle_view_events(ack: Ack, view: dict, logger: logging.Logger):
-#     # 送信された input ブロックの情報はこの階層以下に入っています
-#     inputs = view['state']['values']
-#     # 最後の 'value' でアクセスしているところはブロックエレメントのタイプによっては異なります
-#     # パターンによってどのように異なるかは後ほど詳細を説明します
-#     question = inputs.get('question-block', {}).get('input-element', {}).get('value')
-#     # 入力チェック
-#     if len(question) < 5:
-#         # エラーメッセージをモーダルに表示
-#         # （このエラーバインディングは input ブロックにしかできないことに注意）
-#         ack(response_action='errors', errors={'question-block': '質問は 5 文字以上で入力してください'})
-#         return
-
-#     # 正常パターン、実際のアプリではこのタイミングでデータを保存したりする
-#     logger.info(f'Received question: {question}')
-
-#     # 空の応答はこのモーダルを閉じる（ここまで 3 秒以内である必要あり）
-#     ack()

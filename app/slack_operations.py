@@ -1,4 +1,5 @@
 import os
+from typing import List
 from slack_sdk import WebClient
 from slack_sdk.errors import SlackApiError
 from slack_bolt import App, Ack
@@ -10,12 +11,6 @@ import time
 
 # https://slack.dev/python-slack-sdk/web/index.html#conversations
 
-# app = App(token=os.environ.get("SLACK_BOT_TOKEN_SLACK_OPERATIONS"))
-
-'''
-流れとしては・・・
-1. メンションで処理呼び出し受け付け
-'''
 # Listup channels
 # https://api.slack.com/methods/conversations.list/code
 def fetch_conversations(client: WebClient):
@@ -32,28 +27,36 @@ def fetch_conversations(client: WebClient):
         print('Error fetching conversations: {}'.format(e))
 
 # Create Channnel
-# https://api.slack.com/methods/conversations.create/code
-def create_conversations(client: WebClient):
+# https://api.slack.com/methods/conversations.create
+def create_conversation(client: WebClient,channel_name:str):
     try:
-        channel_name = f'my-private-channel-{round(time())}'
+        # channel_name = f'my-private-channel-{round(time())}'
         response = client.conversations_create(
             name=channel_name,
             is_private=False
         )
-        channel_id = response['channel']['id']
-        print(channel_id)
-    # response = client.conversations_archive(channel=channel_id)
+        channel = response['channel']
+        return channel
     except SlackApiError as e:
-        print('Error fetching conversations: {}'.format(e))
+        print('Error creating conversations: {}'.format(e))
 
-def invite_user(client: WebClient):
+def getting_conversation_info(client: WebClient,channel_id:str):
+    try:
+        response = client.conversations_info(
+        channel=channel_id,
+        include_num_members=0
+        )
+        return response['channel']
+    except SlackApiError as e:
+        print('Error creating conversations: {}'.format(e))
+
+def invite_users(client: WebClient,channel_id:str,invite_users_list:List[str]):
     try:
         response = client.conversations_invite(
-            channel='C02SC65KEBD',
-            users=['U06Q3MANP29']
+            channel=channel_id,
+            users=invite_users_list
+            # users=['U06Q3MANP29']
         )
-        print(response)
+        return response
     except SlackApiError as e:
-        print('Error fetching conversations: {}'.format(e))
-        # 既に参加した状態でAPI実行したとき、以下のレスポンス
-        # {'ok': False, 'error': 'already_in_channel', 'errors': [{'user': 'U06Q3MANP29', 'ok': False, 'error': 'already_in_channel'}]}
+        print('Error inviting conversations: {}'.format(e))
