@@ -44,6 +44,55 @@ SELECT_ACTION_DROPDOWN_BLOCK = {
                     }
                 }
 
+# 新規チャンネル名入力
+INPUT_NEW_CHANNEL_BLOCK = {
+                'type': 'input',
+                'block_id': 'create-channel',
+                'element': {
+                                'type': 'plain_text_input', 
+                                'action_id': 'action-id',
+                                'placeholder': {
+                                    'type': 'plain_text',
+                                    'text': 'チャンネル名入力',
+                                }
+                            },
+                'label': {'type': 'plain_text', 'text': '新規チャンネル名'},
+                'optional': False,
+            }
+
+# 新規チャンネル名入力補足
+INPUT_NEW_CHANNEL_BLOCK_EXPLAIN = {
+                                    "type": "context",
+                                    "elements": [
+                                        {
+                                            "type": "plain_text",
+                                            "text": "英字・記号について、英字は小文字、記号はハイフン・アンダースコアのみ使用可能",
+                                            "emoji": True
+                                        }
+                                    ]
+                                }
+
+# 既存チャンネル選択
+SELECT_EXIST_CHANNELS_BLOCK = {
+                                'type': 'input',
+                                'label': {
+                                    'type': 'plain_text',
+                                    'text': '既存チャンネル名'
+                                    
+                                },
+                                'optional': False,
+                                'block_id': 'select-channel',
+                                'element': {
+                                    'type': 'conversations_select',
+                                    # 'type': 'multi_conversations_select',
+                                    'placeholder': {
+                                        'type': 'plain_text',
+                                        'text': ':mega: メンバー追加するチャンネル選択'
+                                    },
+                                    'action_id': 'conversations_select-action'
+                                }
+                            }
+
 # ユーザ複数選択のBLOCK
 SELECT_MULTI_USER_BLOCK = {
                             'type': 'input',
@@ -62,6 +111,68 @@ SELECT_MULTI_USER_BLOCK = {
                             },
                             'optional': False,
                         }
+
+# 承認者選択
+APPROVER_USER_BLOCK = {
+                        'type': 'input',
+                        'block_id': 'approve-user',
+                        'element': {
+                            'type': 'users_select',
+                            'placeholder': {
+                                'type': 'plain_text',
+                                'text': 'Select users',
+                            },
+                            'action_id': 'approve-user-action'
+                        },
+                        'label': {
+                            'type': 'plain_text',
+                            'text': '依頼先',
+                        },
+                        'optional': False,
+                    }
+
+# 承認者選択補足
+APPROVER_USER_BLOCK_EXPLAIN = {
+                                    "type": "context",
+                                    "elements": [
+                                        {
+                                            "type": "plain_text",
+                                            "text": "承認を依頼するメンバーを選択",
+                                            "emoji": True
+                                        }
+                                    ]
+                                }
+
+# 承認/否決
+RADIO_APPROVE_REFUSE_BLOCK = {
+			"type": "section",
+			"text": {
+				"type": "mrkdwn",
+				"text": "Section block with radio buttons"
+			},
+			"accessory": {
+				"type": "radio_buttons",
+				"options": [
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "承認",
+							"emoji": True
+						},
+						"value": "ok"
+					},
+					{
+						"text": {
+							"type": "plain_text",
+							"text": "否決",
+							"emoji": True
+						},
+						"value": "ng"
+					},
+				],
+				"action_id": "radio_buttons-action"
+			}
+		}
 
 # ボットトークンとソケットモードハンドラーを使ってアプリを初期化
 app = App(token = os.environ.get('SLACK_BOT_TOKEN'), 
@@ -113,30 +224,10 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
     
     if selected_operation == 'create-channel':
         view['blocks'] = [
-            {
-                'type': 'input',
-                'block_id': 'create-channel',
-                'element': {
-                                'type': 'plain_text_input', 
-                                'action_id': 'action-id',
-                                'placeholder': {
-                                    'type': 'plain_text',
-                                    'text': 'チャンネル名入力',
-                                }
-                            },
-                'label': {'type': 'plain_text', 'text': '新規チャンネル名'},
-                'optional': False,
-            },
-            {
-			"type": "context",
-			"elements": [
-				{
-					"type": "plain_text",
-					"text": "英字・記号について、英字は小文字、記号はハイフン・アンダースコアのみ使用可能",
-					"emoji": True
-				}
-			]
-		    },
+            APPROVER_USER_BLOCK,
+            APPROVER_USER_BLOCK_EXPLAIN,
+            INPUT_NEW_CHANNEL_BLOCK,
+            INPUT_NEW_CHANNEL_BLOCK_EXPLAIN,
             SELECT_MULTI_USER_BLOCK
                 ]
         client.views_update(
@@ -146,67 +237,29 @@ def update_modal(ack: Ack, body: dict, client: WebClient):
         )
     elif selected_operation == 'add-members':
         view['blocks'] = [
-                    {
-                        'type': 'input',
-                        'label': {
-                            'type': 'plain_text',
-                            'text': '既存チャンネル名'
-                            
-                        },
-                        'optional': False,
-                        'block_id': 'select-channel',
-                        'element': {
-                            'type': 'conversations_select',
-                            # 'type': 'multi_conversations_select',
-                            'placeholder': {
-                                'type': 'plain_text',
-                                'text': ':mega: メンバー追加するチャンネル選択'
-                            },
-                            'action_id': 'conversations_select-action'
-                        }
-                    }, 
-                    SELECT_MULTI_USER_BLOCK
+            APPROVER_USER_BLOCK,
+            SELECT_EXIST_CHANNELS_BLOCK, 
+            SELECT_MULTI_USER_BLOCK
                 ]
         client.views_update(
             view_id=body['view']['id'],
             hash=body['view']['hash'],
             view=view
         )
-    else:
-        view['blocks']=[
-            {
-                'type': 'section',
-                'text': {
-                    'type': 'plain_text',
-                    'text': 'This is a plain text section block.',
-                }
-            }
-            ]
-        client.views_update(
-            view_id=body['view']['id'],
-            hash=body['view']['hash'],  
-            view=view
-                # {
-                #     "type": "section",
-                #     "text": {"type": "plain_text", "text":"You updated the modal!"}
-                # },
-                # {
-                #     "type": "image",
-                #     "image_url": "https://media.giphy.com/media/SVZGEcYt7brkFUyU90/giphy.gif",
-                #     "alt_text":"Yay!The modal was updated"
-                # }
-    )
 
 # view_submissionリクエストを処理
 @app.view('modal-id')
 def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger):
+    # モーダルを閉じる
+    ack()
     # ユーザに表示する情報
     action = ''
     target_channel_name = ''
     errors = {}
-
+    
     # 入力値の検証
     submitted_data = view['state']['values']
+
     if submitted_data.get('create-channel'): # チャンネル新規作成の場合
         action = ' チャンネル新規作成'
         input_channel_name = submitted_data['create-channel']['action-id']['value']
@@ -237,45 +290,133 @@ def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger)
         channel = slack_operations.getting_conversation_info(client=client,channel_id=input_channel_id)
         target_channel_name = channel['name']
     
-    users = submitted_data['select-users']['select-users-action']['selected_users']
-    res = slack_operations.invite_users(client,channel_id=input_channel_id, invite_users_list=users)
-    
-    if res is None:
-        errors['select-users'] = '参加メンバーのみ選択されています。'
-        ack(response_action='errors', errors=errors)
-        return
-
-    # モーダルを閉じる
-    ack()
-    
-    # ユーザーにメッセージを送信
+    # チャンネルへ依頼内容送信
     userId = body['user']['id']
-    msg = f'<@{userId}>さんから申請がありました\n\n■申請内容:{action}\n\n■チャンネル名:{target_channel_name}'
+    blocks_to_channel = {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": f"<@{userId}>さんから申請\n\n*this is bold*, and ~this is crossed out~, and <https://google.com|this is a link>"
+                    }
+		        }
     try:
-        client.chat_postMessage(channel = os.environ.get('REQUEST_NOTIFY_CHANNEL','work'), text=msg)
+        client.chat_postMessage(
+            channel = os.environ.get('REQUEST_NOTIFY_CHANNEL','work'),
+            text=target_channel_name,
+            blocks=[
+                blocks_to_channel
+            ]
+            )
     except Exception as e:
         logger.exception(f'Failed to post a message {e}')
-        
-@app.event('app_mention')
-def handle_app_mention(body: dict, say, logger,client: WebClient):
-    # メンションされたメッセージを取得
 
-    mention = body['event']
-    print(mention)
-    # メンションされたメッセージを取得
-    text = mention['text']
-    thread_ts = mention['ts']
+    # 承認者へDM送信
+    approveUserId = submitted_data['approve-user']['approve-user-action']['selected_user']
+    try:
+        client.chat_postMessage(
+            channel = approveUserId, 
+            text=target_channel_name,
+            blocks=[
+                blocks_to_channel,
+                {
+                    'type': 'section',
+                    'text': {
+                        'type': 'mrkdwn',
+                        'text': '承認/否決を決定'
+                    },
+                    'accessory': {
+                        'type': 'button',
+                        'text': {
+                            'type': 'plain_text',
+                            'text': '決定',
+                            'emoji': True
+                        },
+                        'value': 'click_me_123',
+                        'action_id': 'approve_reject_decision_action'
+                    }
+                }
+            ]
+            )
+    except Exception as e:
+        logger.exception(f'Failed to post a message {e}')
     
-    slack_operations.fetch_conversations(client)
-    # create_conversations(client)
-    # invite_user(client)
+@app.action('approve_reject_decision_action')
+def open_modal_approve_reject_decision(ack: Ack, body: dict, view, client: WebClient):
+    print(body)
+    ack()
     
-    # 例: メンションされたメッセージをログに出力する
-    logger.info(f'メンションされました: {text}')
+    # モーダル生成
+    client.views_open(
+        trigger_id=body['trigger_id'],
+        view = {
+            'type': 'modal',
+            'callback_id': 'modal-id2',
+            'title': {'type': 'plain_text', 'text': 'Slackチャンネル設定ツール'},
+            'submit': {'type': 'plain_text', 'text': '送信'},
+            'close': {'type': 'plain_text', 'text': '閉じる'},
+            'blocks': [
+                RADIO_APPROVE_REFUSE_BLOCK,
+                    {
+                            'type': 'input',
+                            'element': {
+                                'type': 'plain_text_input',
+                                'multiline': True,
+                                'action_id': 'plain_text_input-action'
+                            },
+                            'label': {
+                                'type': 'plain_text',
+                                'text': 'Label',
+                                'emoji': True
+                            }
+                    }
+                        ],
+        },
+    )
+
+# view_submissionリクエストを処理
+@app.view('modal-id2')
+def handle_submission(ack: Ack, body, client, view: dict, logger:logging.Logger):
+    ack()
+    # print(body)
     
-    # 応答メッセージを送信（スレッドに送信）
-    # https://zenn.dev/t_yng/scraps/8374a9616c235e
-    say(f'{text}', thread_ts=thread_ts)
+    # users = submitted_data['select-users']['select-users-action']['selected_users']
+    # res = slack_operations.invite_users(client,channel_id=input_channel_id, invite_users_list=users)
+    
+    # if res is None:
+    #     errors['select-users'] = '参加メンバーのみ選択されています。'
+    #     ack(response_action='errors', errors=errors)
+    #     return
+    
+    # # ユーザーにメッセージを送信
+    # userId = body['user']['id']
+    # msg = f'<@{userId}>さんから申請がありました\n\n■申請内容:{action}\n\n■チャンネル名:{target_channel_name}'
+    # try:
+    #     client.chat_postMessage(channel = os.environ.get('REQUEST_NOTIFY_CHANNEL','work'), text=msg)
+    # except Exception as e:
+    #     logger.exception(f'Failed to post a message {e}')
+    
+
+# @app.event('app_mention')
+# def handle_app_mention(body: dict, say, logger,client: WebClient):
+#     # メンションされたメッセージを取得
+
+#     print(body)
+#     mention = body['event']
+#     print(mention)
+#     # メンションされたメッセージを取得
+#     text = mention['text']
+#     thread_ts = mention['ts']
+    
+#     slack_operations.fetch_conversations(client)
+#     # create_conversations(client)
+#     # invite_user(client)
+    
+#     # 例: メンションされたメッセージをログに出力する
+#     logger.info(f'メンションされました: {text}')
+    
+#     # 応答メッセージを送信（スレッドに送信）
+#     # https://zenn.dev/t_yng/scraps/8374a9616c235e
+#     say(f'{text}', thread_ts=thread_ts)
 
 # アプリを起動
 if __name__ == '__main__':
